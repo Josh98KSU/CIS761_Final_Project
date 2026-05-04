@@ -7,12 +7,6 @@ public class SQLassign {
 	public static void usage() {
 		/* prints the choices for commands and parameters */
 		System.out.println("\n *** Please enter one of the following commands *** ");
-		/*System.out.println("> search <movie title>");
-		System.out.println("> plan [<plan id>]");
-		System.out.println("> rent <movie id>");
-		System.out.println("> return <movie id>");
-		System.out.println("> fastsearch <movie title>");
-		System.out.println("> quit");*/
     System.out.println("> insert entry (i)");
     System.out.println("> update entry (u)");
     System.out.println("> delete entry (d)");
@@ -34,13 +28,6 @@ public class SQLassign {
 
 				BufferedReader r = new BufferedReader(new InputStreamReader(
 						System.in));
-				/* before prompting the user, tell her/him how many movies he can still rent */
-        
-        //NOTE: WILL NEED TO CHANGE THESE
-        
-        
-				//q.transaction_personal_data(cid); 
-				//System.out.print("> ");
 
 				response = r.readLine();
 
@@ -48,16 +35,6 @@ public class SQLassign {
 				String t = st.nextToken();
 
 				if (t.equals("i")) {
-					/* search for a movie whose title matches a string */
-					//if (st.hasMoreTokens()) {
-						//String movie_title = st.nextToken("\n").trim(); /* read the rest of the line */
-						/*System.out.println("Searching for the movie '"
-								+ movie_title + "'");
-						q.transaction_search(cid, movie_title);
-					} else {
-						System.out
-								.println("Error: need to type in movie title");
-					}*/
           System.out.print("Write your insert statement:");
           response = r.readLine();
           st = new StringTokenizer(response);
@@ -74,25 +51,6 @@ public class SQLassign {
 				}
 
 				else if (t.equals("u")) {
-					/* choose a new rental plan, or, if none is given, then list all available plans */
-					//if (st.hasMoreTokens()) {
-						//int plan_id = Integer.parseInt(st.nextToken());
-						/* need to check that plan_id is a valid plan id in the database, */
-						/* if yes, then set the new plan for the current customer */
-						/* if not, then list all available plans */
-						/*boolean correct_plan = q.helper_check_plan(plan_id);
-						if (correct_plan) {
-							System.out.println("Switching to plan " + plan_id);
-							q.transaction_choose_plan(cid, plan_id);
-						} else {
-							System.out.println("Incorrect plan id " + plan_id
-									+ "\nAvailable plans are:");
-							q.transaction_list_plans();
-						}
-					} else {
-						System.out.println("Available plans:");
-						q.transaction_list_plans();
-					}*/
           System.out.print("Write your update statement:");
           response = r.readLine();
           st = new StringTokenizer(response);
@@ -107,10 +65,6 @@ public class SQLassign {
 				}
 
 				else if (t.equals("d")) {
-					/* rent the movie with the given movie id */
-					/*String movie_id = st.nextToken("\n").trim();
-					System.out.println("Renting the movie id " + movie_id);
-					q.transaction_rent(cid, movie_id);*/
           System.out.println("Write your delete statement:");
           response = r.readLine();
           st = new StringTokenizer(response);
@@ -152,13 +106,9 @@ public class SQLassign {
                   response = r.readLine();
                   st = new StringTokenizer(response);
                   String id = st.nextToken("\n");
-                  System.out.println("Debug: " + id);
                   try {
                     int int_id = Integer.parseInt(id);
-                    System.out.println("Debug: " + int_id);
-                    //q.transaction_query(n, new String[]{id});
-                    String[] x = new String[]{id};
-                    q.transaction_query(n, x);
+                    q.transaction_query(n, new String[]{id});
                   } catch (Exception e) {
                     System.out.println("Error: " + e);
                   }
@@ -302,7 +252,7 @@ public class SQLassign {
                       String price = st.nextToken("\n");
                       try {
                         float price_f = Float.parseFloat(price);
-                        q.transaction_query(n, new String[]{manufacturer, rate, price});
+                        q.transaction_report(n, new String[]{manufacturer, price, rate});
                       } catch (Exception e) {
                         System.out.println("Error: " + e);
                       }
@@ -325,7 +275,7 @@ public class SQLassign {
                 case 3:
                   System.out.println("Query processing...");
                   try {
-                    q.transaction_query(n, null);
+                    q.transaction_report(n, null);
                   }
                   catch (Exception e) {
                     System.out.println("Error: " + e);
@@ -341,7 +291,7 @@ public class SQLassign {
                 case 5:
                   System.out.println("Query processing...");
                   try {
-                    q.transaction_query(n, null);
+                    q.transaction_report(n, null);
                   }
                   catch (Exception e) {
                     System.out.println("Error: " + e);
@@ -358,25 +308,7 @@ public class SQLassign {
           else {
             System.out.println("Error: Invalid input, booting back to main loop");
           }
-					/* return a movie previously rented */
-					//String movie_id = st.nextToken("\n").trim();
-					/* return the movie with mid */
-					//System.out.println("Returning the movie id " + movie_id);
-					//q.transaction_return(cid, movie_id);
 				}
-
-				//else if (t.equals("fastsearch")) {
-					/* same as search, only faster */
-					/*if (st.hasMoreTokens()) {
-						String movie_title = st.nextToken("\n").trim();
-						System.out.println("Fast Searching for the movie '"
-								+ movie_title + "'");
-						q.transaction_fast_search(cid, movie_title);
-					} else {
-						System.out
-								.println("Error: need to type in movie title");
-					}
-				}*/
 
 				else if (t.equals("quit")) {
 					System.exit(0);
@@ -394,12 +326,6 @@ public class SQLassign {
 	}
 
 	public static void main(String[] args) {
-
-		/*if (args.length < 2)
-		{
-			System.out.println("Usage: java SQLassign CUSTOMER_ID CUSTOMER_PASSWORD");
-			System.exit(1);
-		}*/
 		
 		try {
 
@@ -409,13 +335,6 @@ public class SQLassign {
 			q.prepareStatements();
       menu(1, q);
       q.closeConnections();
-			/* authenticate the user */
-			//int cid = q.transaction_login(args[0], args[1]);			
-			//if (cid >= 0)
-			//	menu(cid, q); /* menu(...) does the real work */
-			//else
-			//	System.out.println("Sorry..."); /* innocent mistake, or malicious attack ? */
-			//q.closeConnections();
 
 		} catch (Exception e) {
 			System.out.println("Error: " + e.getMessage());

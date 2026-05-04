@@ -403,7 +403,7 @@ INSERT INTO Part_Review (user_id, part_id, review_time, rating, comment) VALUES
 
 -- i7-14700K (part 2)
 (6,  2, '2023-11-01 11:00:00', 5, 'Perfect balance of cores and price.'),
-(17, 2, '2024-04-03 10:00:00', 5, 'Solid chip, runs great on my Z790 board.'),
+(17, 2, '2025-08-08 10:00:00', 1, 'Burned out my board'),
 
 -- Ryzen 9 7950X (part 5)
 (2,  5, '2023-01-10 12:00:00', 5, 'Incredible for video rendering. Workstation beast.'),
