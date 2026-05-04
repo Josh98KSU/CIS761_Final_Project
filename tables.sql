@@ -150,10 +150,10 @@ CREATE TABLE Favorite_Parts (
 );
 
 -- ============================================================
--- Part_Review  (join table: Users ↔ PC_Parts, with review_time
+-- Part_Review  (join table: Users ↔ PC_Parts, with timestamp
 --              to allow a user to review the same part again
 --              at a different time)
--- PK is composite (user_id, part_id, review_time).
+-- PK is composite (user_id, part_id, timestamp).
 -- No additional unique keys.
 -- ============================================================
 CREATE TABLE Part_Review (

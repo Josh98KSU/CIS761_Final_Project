@@ -348,7 +348,7 @@ public class SQLassign {
                   }
                   break;
                 default:
-                  System.out.println("Error: input invalid.");
+                  System.out.println("Error: number not a valid query. Booting back to main loop.");
                   break;
               }
             } catch (Exception e) {

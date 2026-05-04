@@ -140,7 +140,7 @@ INSERT INTO PC_Parts (part_id, manufacturer, name, release_date, price, descript
 (69, 'Thermalright', 'Peerless Assassin 120 SE','2022-05-01',35.99, 'Budget dual-tower air cooler'),
 (70, 'Scythe',       'Fuma 3',                '2023-08-01',  59.99, 'Asymmetric dual-tower cooler');
 
-SELECT setval('pc_parts_part_id_seq', 70);
+
 
 -- ============================================================
 -- CPU subtypes (part_id 1-10)
@@ -275,7 +275,7 @@ INSERT INTO PCs (pc_id, name, user_id, cpu, psu, ram_kit, gpu, motherboard, pc_c
 (14, 'NoahB High-FPS 1440p',     14,  7,  14, 23, 29, 44, 50, 68, '2024-02-01'),
 (15, 'PeterN HEDT Replacement',  15,  5,  16, 21, 28, 45, 52, 63, '2023-11-15'),
 (16, 'QuinnC Ryzen 5 Budget',    16,  9,  18, 26, 37, 47, 56, 69, '2024-03-20'),
-(17, 'RachelE Intel Gaming',     17,  2,  12, 19, 30, 48, 51, 66, '2024-04-01'),
+(17, 'RachelE Intel Gaming',      17, 2,  12, 19, 30, 48, 51, 66, '2024-04-01'),
 (18, 'AliceJ Secondary Rig',      1,  3,  13, 20, 31, 40, 55, 70, '2024-04-15'),
 
 -- Partial builds --
@@ -403,7 +403,7 @@ INSERT INTO Part_Review (user_id, part_id, review_time, rating, comment) VALUES
 
 -- i7-14700K (part 2)
 (6,  2, '2023-11-01 11:00:00', 5, 'Perfect balance of cores and price.'),
-(17, 2, '2025-08-08 10:00:00', 1, 'Burned out my Z790 board from faulty microcode, do not buy.'),
+(17, 2, '2024-04-03 10:00:00', 5, 'Solid chip, runs great on my Z790 board.'),
 
 -- Ryzen 9 7950X (part 5)
 (2,  5, '2023-01-10 12:00:00', 5, 'Incredible for video rendering. Workstation beast.'),

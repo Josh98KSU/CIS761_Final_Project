@@ -71,16 +71,20 @@ public class Query {
   private String _user_favorite_part_list_sql = "Select fp.part_id from Users u join Favorite_Parts fp on u.user_id = fp.user_id where u.user_id = ?";
   private PreparedStatement _user_favorite_part_list_statement;
   
-  private String _oldest_oldest_sql = "Select u.user_id from Users u join Part_Reviews r on u.user_id = r.user_id where u.created_on = min(u.created_on) AND min(r.timestamp)";
+  //private String _oldest_oldest_sql = "Select u.user_id from Users u join Part_Review r on u.user_id = r.user_id where u.created_on = min(u.created_on) AND min(r.timestamp)";
+  private String _oldest_oldest_sql = "Select r.* from Part_Review r where r.user_id in (" +
+  "select user_id from Users where created_on = (select min(created_on) from Users))" +
+  "and r.review_time = (" +
+  "select min(review_time) from Part_review where user_id in (select user_id from Users where created_on = (select min(created_on) from Users)));";
   private PreparedStatement _oldest_oldest_statement;
   
   private String _gpu_most_builds_sql = "Select count(*) as build_count from PCs group by GPU order by build_count desc limit 1 ";
   private PreparedStatement _gpu_most_builds_statement;
   
-  private String _nvidia_gpu_count_sql = "Select count(p.GPU) from PCs p join PC_Parts pa on p.part_id = pa.part_id where manufacturer = 'NVIDIA'";
+  private String _nvidia_gpu_count_sql = "Select count(p.gpu) from PCs p join PC_Parts pa on p.gpu = pa.part_id where manufacturer = 'NVIDIA'";
   private PreparedStatement _nvidia_gpu_count_statement;
   
-  private String _gpu_below_avg_sql = "Select g.part_id from GPU g join PC_Parts p on g.part_id = p.part_id where p.price <= (Select avg(pa.price) from GPU gp join PC_parts pa on gp.part_id = pa.part_id)";
+  private String _gpu_below_avg_sql = "Select g.part_id from GPU g join PC_Parts p on g.part_id = p.part_id where p.price <= (Select avg(pa.price) from GPU gp join PC_Parts pa on gp.part_id = pa.part_id)";
   private PreparedStatement _gpu_below_avg_statement; 
   
   private String _expensive_pc_sql = "Select p.pc_id, (gpu_part.price + cpu_part.price + psu_part.price + ram_part.price + mot_part.price + cas_part.price + coo_part.price) as total_build_price from PCs p" +
@@ -198,26 +202,47 @@ public class Query {
     /**********************************************************/
     /* Connection to MySQL database */
 
-public void openConnections() throws Exception {
+	public void openConnections() throws Exception {
+        
+        /* open connections to TWO databases: movie and  customer databases */
+        
+		configProps.load(new FileInputStream("dbconn.config"));
+        
+		MySqlServerDriver    = configProps.getProperty("MySqlServerDriver"); //note: shouldn't be necessary, leaving it in for the time being to test in case it screws something up
+		MySqlServerUrl 	   = configProps.getProperty("MySqlServerUrl");
+		MySqlServerUser 	   = configProps.getProperty("MySqlServerUser");
+		MySqlServerPassword  = configProps.getProperty("MySqlServerPassword");
+        
+        PostgreSqlServerDriver    = configProps.getProperty("PostgreSqlServerDriver");
+        PostgreSqlServerUrl 	   = configProps.getProperty("PostgreSqlServerUrl");
+        PostgreSqlServerUser 	   = configProps.getProperty("PostgreSqlServerUser");
+        PostgreSqlServerPassword  = configProps.getProperty("PostgreSqlServerPassword");
+                              
+		/* load jdbc driver for MySQL */
+		Class.forName(MySqlServerDriver).getDeclaredConstructor().newInstance(); //note: shouldn't be necessary, leaving it in for the time being to test in case it screws something up
 
-    configProps.load(new FileInputStream("dbconn.config"));
-
-    PostgreSqlServerDriver   = configProps.getProperty("PostgreSqlServerDriver");
-    PostgreSqlServerUrl      = configProps.getProperty("PostgreSqlServerUrl");
-    PostgreSqlServerUser     = configProps.getProperty("PostgreSqlServerUser");
-    PostgreSqlServerPassword = configProps.getProperty("PostgreSqlServerPassword");
-
-    Class.forName(PostgreSqlServerDriver).getDeclaredConstructor().newInstance();
-
-    String PostgreSqlConnectionString =
-        PostgreSqlServerUrl + "?ssl=true&sslfactory=org.postgresql.ssl.NonValidatingFactory";
-
-    _postgreSqlDB = DriverManager.getConnection(
-        PostgreSqlConnectionString,
-        PostgreSqlServerUser,
-        PostgreSqlServerPassword
-    );
-}
+		/* open a connection to your mySQL database that contains the movie database */
+		_mySqlDB = DriverManager.getConnection(MySqlServerUrl, // database
+				MySqlServerUser, // user
+				MySqlServerPassword); // password
+		
+		//_postgreSqlDB = DriverManager.getConnection(PostgreSqlServerUrl);
+     
+        /* load jdbc driver for PostgreSQL */
+        Class.forName(PostgreSqlServerDriver).getDeclaredConstructor().newInstance();
+        
+        String PostgreSqlConnectionString = PostgreSqlServerUrl+"?ssl=true&sslfactory=org.postgresql.ssl.NonValidatingFactory&user="+
+        		PostgreSqlServerUser+"&password=" + PostgreSqlServerPassword;
+        
+        
+        /* open a connection to your postgreSQL database that contains the customer database */
+        _postgreSqlDB = DriverManager.getConnection(PostgreSqlConnectionString);
+        		
+        		//DriverManager.getConnection(PostgreSqlServerUrl, // database
+                                              // PostgreSqlServerUser, // user
+                                              // PostgreSqlServerPassword); // password
+	
+	}
 
 	public void closeConnections() throws Exception {
 		_mySqlDB.close();
@@ -417,7 +442,7 @@ public void openConnections() throws Exception {
         break;
       case 3:
         _user_favorite_part_list_statement.clearParameters();
-        _user_favorite_part_list_statement.setString(1, params[0]);
+        _user_favorite_part_list_statement.setInt(1, Integer.parseInt(params[0]));
         ResultSet list_set = _user_favorite_part_list_statement.executeQuery();
         while (list_set.next()) {
           System.out.println("Part ID: " + list_set.getString(1));
