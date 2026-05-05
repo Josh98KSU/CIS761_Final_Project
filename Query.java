@@ -102,11 +102,11 @@ public class Query {
   private PreparedStatement _one_star_on_build_statement;
   
   private String _parts_since_date_sql = "Select pp.part_id, pp.manufacturer, pp.name, pp.release_date," +
-  "avg(pr.rating) as avg_rating, count(pr.user_id) as popularity " +
+  "avg(pr.rating)::REAL as avg_rating, count(pr.user_id) as popularity " +
   "From PC_Parts pp " +
   "Left join Part_Review pr on pp.part_id = pr.part_id " +
   "Where pp.release_date >= '2024-01-01' " +
-  "Group by pp.part_id, pp.manufacturer, pp.name, pp.release_date " +
+  "Group by pp.part_id, pp.manufacturer, pp.name, pp.release_date Having avg(pr.rating) > 0 " +
   "Order by avg_rating desc, popularity desc; ";
   private PreparedStatement _parts_since_date_statement;
   
@@ -117,7 +117,7 @@ public class Query {
   private String _part_by_rating_review_sql = "Select pp.part_id, pp.manufacturer, pp.name, avg(pr.rating)::REAL as avg_rating, count(pr.user_id) as review_count " +
   "From PC_Parts pp " +
   "Left join Part_Review pr on pp.part_id = pr.part_id " +
-  "Group by pp.part_id, pp.manufacturer, pp.name " +
+  "Group by pp.part_id, pp.manufacturer, pp.name Having avg(pr.rating) > 0 " +
   "Order by avg_rating desc, review_count desc; ";
   private PreparedStatement _part_by_rating_review_statement;
  
@@ -207,7 +207,9 @@ public class Query {
         _compatability_check_statement.setInt(1, Integer.parseInt(params[0]));
         ResultSet compat_set = _compatability_check_statement.executeQuery();
 		    while (compat_set.next()) {
-          System.out.println(compat_set.getString(1)); //note: this might output 1 or 0, not sure
+          if (compat_set.getString(1).equals("1")) System.out.println("PC compatable");
+          else System.out.println("PC incompatable");
+          //System.out.println(compat_set.getString(1)); //note: this might output 1 or 0, not sure
         }
         break;
       case 2:
@@ -227,13 +229,14 @@ public class Query {
       case 4:
         ResultSet old_set = _oldest_oldest_statement.executeQuery();
         while (old_set.next()) {
-          System.out.println("User ID: " + old_set.getString(1));
+          System.out.println("User ID: " + old_set.getString(1) + "\tPart ID: " + old_set.getString(2) + "\tReview_Time: " +
+            old_set.getString(3) + "\tRating: " + old_set.getString(4) + "\tComment: " + old_set.getString(5));
         }
         break;
       case 5:
         ResultSet build_set = _gpu_most_builds_statement.executeQuery();
         while (build_set.next()) {
-          System.out.println("GPU: " + build_set.getString(1));
+          System.out.println("GPU ID: " + build_set.getString(1));
         }
         break;
       case 6:
