@@ -1488,3 +1488,25 @@ INSERT INTO PCs (pc_id, cpu, psu, ram_kit, gpu, motherboard, pc_case, cooler, us
 (70, 117, 237, 177, 297, 477, 417, 357, 12, 'Turbo', '2026-01-05 13:07:00');
 
 SELECT setval('pcs_pc_id_seq', 71);
+
+-- Part_Type_Map table inserts
+INSERT INTO Part_Type_Map (part_id, part_type)
+SELECT part_id, 'CPU' FROM CPU;
+ 
+INSERT INTO Part_Type_Map (part_id, part_type)
+SELECT part_id, 'GPU' FROM GPU;
+ 
+INSERT INTO Part_Type_Map (part_id, part_type)
+SELECT part_id, 'RAM' FROM RAM;
+ 
+INSERT INTO Part_Type_Map (part_id, part_type)
+SELECT part_id, 'PSU' FROM PSU;
+ 
+INSERT INTO Part_Type_Map (part_id, part_type)
+SELECT part_id, 'MOTHERBOARD' FROM Motherboard;
+ 
+INSERT INTO Part_Type_Map (part_id, part_type)
+SELECT part_id, 'CASE' FROM PC_Case;
+ 
+INSERT INTO Part_Type_Map (part_id, part_type)
+SELECT part_id, 'COOLER' FROM Cooler;

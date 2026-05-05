@@ -164,3 +164,16 @@ CREATE TABLE Part_Review (
     comment   TEXT,
     PRIMARY KEY (user_id, part_id, review_time)
 );
+
+-- ============================================================
+-- Part_Type_Map  (join table: PC_Parts ↔ Individual part tables
+--                to make it simpler for the INSERT, UPDATE, and
+--                DELETE statements to check if a part is a 
+--                specific type)
+-- part_id is both PK and FK → PC_Parts.
+-- No additional unique keys.
+-- ============================================================
+CREATE TABLE Part_Type_Map (
+    part_id INT PRIMARY KEY REFERENCES PC_Parts(part_id),
+    part_type VARCHAR(20) NOT NULL
+);

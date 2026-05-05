@@ -49,7 +49,7 @@ public class Query {
   private String _users_complete_builds_sql = "Select distinct u.user_id from Users u join PCs p ON u.user_id = p.user_id where num_nonnulls(p.cpu, p.psu, p.ram_kit, p.gpu, p.motherboard, p.pc_case, p.cooler) = 7;";
   private PreparedStatement _users_complete_builds_statement;
   
-  private String _user_favorite_part_list_sql = "Select fp.part_id from Users u join Favorite_Parts fp on u.user_id = fp.user_id where u.user_id = ?";
+  private String _user_favorite_part_list_sql = "Select sum(p.price) from Favorite_Parts fp join PC_Parts p on fp.part_id = p.part_id where fp.user_id = ?";
   private PreparedStatement _user_favorite_part_list_statement;
   
   private String _oldest_oldest_sql = "Select r.* from Part_Review r where r.user_id in (" +
@@ -223,7 +223,7 @@ public class Query {
         _user_favorite_part_list_statement.setInt(1, Integer.parseInt(params[0]));
         ResultSet list_set = _user_favorite_part_list_statement.executeQuery();
         while (list_set.next()) {
-          System.out.println("Part ID: " + list_set.getString(1));
+          System.out.println("Favorite Part list price: " + list_set.getString(1));
         } 
         break;
       case 4:
