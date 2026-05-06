@@ -4,7 +4,11 @@
 -- and referential integrity constraints.
 -- ============================================================
 
+-- Drop functions in reverse dependency order for clean re-runs
+DROP FUNCTION IF EXISTS sync_part_type_map CASCADE;
+
 -- Drop tables in reverse dependency order for clean re-runs
+DROP TABLE IF EXISTS Part_Type_Map;
 DROP TABLE IF EXISTS Part_Review;
 DROP TABLE IF EXISTS Favorite_Parts;
 DROP TABLE IF EXISTS PCs;
@@ -166,14 +170,59 @@ CREATE TABLE Part_Review (
 );
 
 -- ============================================================
--- Part_Type_Map  (join table: PC_Parts ↔ Individual part tables
---                to make it simpler for the INSERT, UPDATE, and
---                DELETE statements to check if a part is a 
---                specific type)
--- part_id is both PK and FK → PC_Parts.
+-- Part_Type_Map  (join table: part tables ↔ PC_Parts)
+-- PK is (part_id).
 -- No additional unique keys.
 -- ============================================================
 CREATE TABLE Part_Type_Map (
-    part_id INT PRIMARY KEY REFERENCES PC_Parts(part_id),
+    part_id INT PRIMARY KEY REFERENCES PC_Parts(part_id) ON DELETE CASCADE,
     part_type VARCHAR(20) NOT NULL
+    CHECK (part_type IN ('CPU','GPU','RAM','MOTHERBOARD','PSU','PC_CASE','COOLER'))
 );
+
+-- ============================================================
+-- TRIGGER LOGIC FOR PART_TYPE_MAP
+-- ============================================================
+
+-- 1. Single reusable function for all part types
+CREATE OR REPLACE FUNCTION sync_part_type_map()
+RETURNS TRIGGER AS $$
+DECLARE
+    part_type_val TEXT;
+BEGIN
+
+    CASE TG_TABLE_NAME
+        WHEN 'cpu' THEN part_type_val := 'CPU';
+        WHEN 'gpu' THEN part_type_val := 'GPU';
+        WHEN 'ram' THEN part_type_val := 'RAM';
+        WHEN 'motherboard' THEN part_type_val := 'MOTHERBOARD';
+        WHEN 'psu' THEN part_type_val := 'PSU';
+        WHEN 'pc_case' THEN part_type_val := 'PC_CASE';
+        WHEN 'cooler' THEN part_type_val := 'COOLER';
+    END CASE;
+
+    INSERT INTO Part_Type_Map (part_id, part_type)
+    VALUES (NEW.part_id, part_type_val)
+    ON CONFLICT (part_id) DO NOTHING;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Drop existing triggers to ensure clean re-runs of the script
+DROP TRIGGER IF EXISTS tr_cpu_sync ON CPU;
+DROP TRIGGER IF EXISTS tr_gpu_sync ON GPU;
+DROP TRIGGER IF EXISTS tr_ram_sync ON RAM;
+DROP TRIGGER IF EXISTS tr_mobo_sync ON Motherboard;
+DROP TRIGGER IF EXISTS tr_psu_sync ON PSU;
+DROP TRIGGER IF EXISTS tr_case_sync ON PC_Case;
+DROP TRIGGER IF EXISTS tr_cooler_sync ON Cooler;
+
+-- 3. Attach the trigger to every specific part table
+CREATE TRIGGER tr_cpu_sync    AFTER INSERT ON CPU         FOR EACH ROW EXECUTE FUNCTION sync_part_type_map();
+CREATE TRIGGER tr_gpu_sync    AFTER INSERT ON GPU         FOR EACH ROW EXECUTE FUNCTION sync_part_type_map();
+CREATE TRIGGER tr_ram_sync    AFTER INSERT ON RAM         FOR EACH ROW EXECUTE FUNCTION sync_part_type_map();
+CREATE TRIGGER tr_mobo_sync   AFTER INSERT ON Motherboard  FOR EACH ROW EXECUTE FUNCTION sync_part_type_map();
+CREATE TRIGGER tr_psu_sync    AFTER INSERT ON PSU         FOR EACH ROW EXECUTE FUNCTION sync_part_type_map();
+CREATE TRIGGER tr_case_sync   AFTER INSERT ON PC_Case      FOR EACH ROW EXECUTE FUNCTION sync_part_type_map();
+CREATE TRIGGER tr_cooler_sync AFTER INSERT ON Cooler      FOR EACH ROW EXECUTE FUNCTION sync_part_type_map();
