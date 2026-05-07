@@ -9,14 +9,21 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Scanner;
 
-// Potentially simplify further, abstract functions to more helper functions.
+import java.sql.Timestamp;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 
-public class DeleteUpdateInsertStatements{
+public class DeleteUpdateInsertStatements {
 
     private Connection _postgresConnection;
 
+    public DeleteUpdateInsertStatements(Connection conn) {
+        this._postgresConnection = conn;
+    }
+
     // Helper Functions
-    private boolean userExists(Integer user_id) throws Exception {
+    private boolean user_exists(Integer user_id) throws Exception {
         String sql = "SELECT 1 FROM Users WHERE user_id = ?";
 
         try (PreparedStatement stmt = _postgresConnection.prepareStatement(sql)) {
@@ -28,7 +35,40 @@ public class DeleteUpdateInsertStatements{
         }
     }
 
-    private boolean partExists(Integer part_id) throws Exception {
+    public int get_user_id() {
+        Scanner sc = new Scanner(System.in);
+        int userId = -1;
+
+        System.out.print("Please enter a User ID: ");
+        if (sc.hasNextInt()) {
+            userId = sc.nextInt();
+            
+            // SQL query to check if the ID exists
+            String query = "SELECT 1 FROM Users WHERE user_id = ?";
+            
+            try (PreparedStatement pstmt = this._postgresConnection.prepareStatement(query)) {
+                pstmt.setInt(1, userId);
+                
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        System.out.println("User ID " + userId + " exists.");
+                    } else {
+                        System.out.println("User ID " + userId + " does not exist.");
+                        userId = -1; // Reset if not found
+                    }
+                }
+            } catch (SQLException e) {
+                System.out.println("Database error: " + e.getMessage());
+                userId = -1;
+            }
+        } else {
+            System.out.println("Invalid input. Please enter a numeric ID.");
+        }
+        
+        return userId;
+    }
+
+    private boolean part_exists(Integer part_id) throws Exception {
         String sql = "SELECT 1 FROM PC_Parts WHERE part_id = ?";
 
         try (PreparedStatement stmt = _postgresConnection.prepareStatement(sql)) {
@@ -40,7 +80,7 @@ public class DeleteUpdateInsertStatements{
         }
     }
 
-    private int getNextId(String tableName, String idColumn) throws Exception {
+    private int get_next_id(String tableName, String idColumn) throws Exception {
         String sql = "SELECT COALESCE(MAX(" + idColumn + "), 0) + 1 AS next_id FROM " + tableName;
 
         try (PreparedStatement stmt = _postgresConnection.prepareStatement(sql);
@@ -51,7 +91,7 @@ public class DeleteUpdateInsertStatements{
         }
     }
 
-    private String getPartType(Integer part_id) throws Exception {
+    private String get_part_type(Integer part_id) throws Exception {
         String sql = "SELECT part_type FROM Part_Type_Map WHERE part_id = ?";
 
         try (PreparedStatement stmt = _postgresConnection.prepareStatement(sql)) {
@@ -64,6 +104,237 @@ public class DeleteUpdateInsertStatements{
                 return rs.getString("part_type");
             }
         }
+    }
+
+    public Timestamp get_review_timestamp(int user_id, int part_id) throws Exception {
+        String sql = "SELECT created_on, review_text, rating FROM Reviews " +
+                    "WHERE user_id = ? AND part_id = ? ORDER BY created_on DESC";
+        
+        List<Timestamp> timestamps = new ArrayList<>();
+        
+        try (PreparedStatement stmt = _postgresConnection.prepareStatement(sql)) {
+            stmt.setInt(1, user_id);
+            stmt.setInt(2, part_id);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                System.out.println("\n--- Your Reviews for Part #" + part_id + " ---");
+                int count = 1;
+                while (rs.next()) {
+                    Timestamp ts = rs.getTimestamp("created_on");
+                    timestamps.add(ts);
+                    
+                    System.out.printf("[%d] Date: %s | Rating: %d/5\n", count, ts.toString(), rs.getInt("rating"));
+                    System.out.println("    Text: " + rs.getString("review_text"));
+                    count++;
+                }
+            }
+        }
+
+        if (timestamps.isEmpty()) {
+            System.out.println("No reviews found for this user/part combination.");
+            return null;
+        }
+
+        // Let the user pick by number
+        Scanner sc = new Scanner(System.in);
+        while (true) {
+            System.out.print("\nSelect the review number to update/delete (or 0 to cancel): ");
+            if (sc.hasNextInt()) {
+                int choice = sc.nextInt();
+                if (choice == 0) return null;
+                if (choice > 0 && choice <= timestamps.size()) {
+                    return timestamps.get(choice - 1);
+                }
+            } else {
+                sc.next(); // clear invalid input
+            }
+            System.out.println("Invalid selection. Please try again.");
+        }
+    }
+
+    // Insert Transaction Bridge Functions
+    // Overload for CPU
+    public void transaction_insert_cpu(Map<String, Object> data) throws Exception {
+        transaction_insert_cpu(
+            (String)  data.get("Socket"),
+            (Integer) data.get("TDP"),
+            (Integer) data.get("Core Count"),
+            (Integer) data.get("Base Clock"),
+            (Integer) data.get("Thread Count"),
+            (Integer) data.get("Boost Clock"),
+            (String)  data.get("Manufacturer"),
+            (String)  data.get("Name"),
+            (Float)   data.get("Price"),
+            (String)  data.get("Description")
+        );
+    }
+
+    // Overload for PSU
+    public void transaction_insert_psu(Map<String, Object> data) throws Exception {
+        transaction_insert_psu(
+            (String)  data.get("Modular"),
+            (Integer) data.get("Wattage"),
+            (String)  data.get("Efficiency"),
+            (String)  data.get("Manufacturer"),
+            (String)  data.get("Name"),
+            (Float)   data.get("Price"),
+            (String)  data.get("Description")
+        );
+    }
+
+    // Overload for RAM
+    public void transaction_insert_ram(Map<String, Object> data) throws Exception {
+        transaction_insert_ram(
+            (String)  data.get("RAM Type"),
+            (Integer) data.get("Number of Sticks"),
+            (Integer) data.get("Capacity"),
+            (Integer) data.get("Speed"),
+            (String)  data.get("Manufacturer"),
+            (String)  data.get("Name"),
+            (Float)   data.get("Price"),
+            (String)  data.get("Description")
+        );
+    }
+
+    // Overload for GPU
+    public void transaction_insert_gpu(Map<String, Object> data) throws Exception {
+        transaction_insert_gpu(
+            (Integer) data.get("VRAM"),
+            (String)  data.get("Chipset"),
+            (Integer) data.get("Length (mm)"),
+            (String)  data.get("Power Connectors"),
+            (String)  data.get("Manufacturer"),
+            (String)  data.get("Name"),
+            (Float)   data.get("Price"),
+            (String)  data.get("Description")
+        );
+    }
+
+    // Overload for Motherboard
+    public void transaction_insert_mobo(Map<String, Object> data) throws Exception {
+        transaction_insert_mobo(
+            (String)  data.get("Socket"),
+            (String)  data.get("Chipset"),
+            (String)  data.get("RAM Type"),
+            (String)  data.get("Form Factor"),
+            (Integer) data.get("Max RAM"),
+            (String)  data.get("Manufacturer"),
+            (String)  data.get("Name"),
+            (Float)   data.get("Price"),
+            (String)  data.get("Description")
+        );
+    }
+
+    // Overload for PC Case
+    public void transaction_insert_pc_case(Map<String, Object> data) throws Exception {
+        transaction_insert_pc_case(
+            (Integer) data.get("Max GPU Size"),
+            (String)  data.get("Form Factor"),
+            (String)  data.get("Color"),
+            (String)  data.get("Manufacturer"),
+            (String)  data.get("Name"),
+            (Float)   data.get("Price"),
+            (String)  data.get("Description")
+        );
+    }
+
+    // Overload for CPU Cooler
+    public void transaction_insert_cooler(Map<String, Object> data) throws Exception {
+        transaction_insert_cooler(
+            (String)  data.get("Cooler Type"),
+            (String)  data.get("Socket Type"),
+            (String)  data.get("Manufacturer"),
+            (String)  data.get("Name"),
+            (Float)   data.get("Price"),
+            (String)  data.get("Description")
+        );
+    }
+
+    // Update Transaction Bridge Functions
+    // PC_Part Update Overload
+    public void transaction_update_pc_part(Integer part_id, Map<String, Object> data) throws Exception {
+        transaction_update_pc_part(
+            part_id,
+            (String)  data.get("Manufacturer"),
+            (String)  data.get("Name"),
+            (Float)   data.get("Price"),
+            (String)  data.get("Description")
+        );
+    }
+    // CPU Update Overload
+    public void transaction_update_cpu(Integer part_id, Map<String, Object> data) throws Exception {
+        transaction_update_cpu(
+            part_id,
+            (String)  data.get("Socket"),
+            (Integer) data.get("TDP"),
+            (Integer) data.get("Core Count"),
+            (Integer) data.get("Base Clock"),
+            (Integer) data.get("Thread Count"),
+            (Integer) data.get("Boost Clock")
+        );
+    }
+
+    // PSU Update Overload
+    public void transaction_update_psu(Integer part_id, Map<String, Object> data) throws Exception {
+        transaction_update_psu(
+            part_id,
+            (String)  data.get("Modular"),
+            (Integer) data.get("Wattage"),
+            (String)  data.get("Efficiency")
+        );
+    }
+
+    // RAM Update Overload
+    public void transaction_update_ram(Integer part_id, Map<String, Object> data) throws Exception {
+        transaction_update_ram(
+            part_id,
+            (String)  data.get("RAM Type"),
+            (Integer) data.get("Number of Sticks"),
+            (Integer) data.get("Capacity"),
+            (Integer) data.get("Speed")
+        );
+    }
+
+    // GPU Update Overload
+    public void transaction_update_gpu(Integer part_id, Map<String, Object> data) throws Exception {
+        transaction_update_gpu(
+            part_id,
+            (Integer) data.get("VRAM"),
+            (String)  data.get("Chipset"),
+            (Integer) data.get("Length (mm)"),
+            (String)  data.get("Power Connectors")
+        );
+    }
+
+    // Motherboard Update Overload
+    public void transaction_update_mobo(Integer part_id, Map<String, Object> data) throws Exception {
+        transaction_update_mobo(
+            part_id,
+            (String)  data.get("Socket"),
+            (String)  data.get("Chipset"),
+            (String)  data.get("RAM Type"),
+            (String)  data.get("Form Factor"),
+            (Integer) data.get("Max RAM")
+        );
+    }
+
+    // PC Case Update Overload
+    public void transaction_update_pc_case(Integer part_id, Map<String, Object> data) throws Exception {
+        transaction_update_pc_case(
+            part_id,
+            (Integer) data.get("Max GPU Size"),
+            (String)  data.get("Form Factor"),
+            (String)  data.get("Color")
+        );
+    }
+
+    // Cooler Update Overload
+    public void transaction_update_cooler(Integer part_id, Map<String, Object> data) throws Exception {
+        transaction_update_cooler(
+            part_id,
+            (String)  data.get("Cooler Type"),
+            (String)  data.get("Socket Type")
+        );
     }
 
     // Inserts
@@ -123,7 +394,7 @@ public class DeleteUpdateInsertStatements{
             idStmt.close();
 
             // 4. insert user
-            String insertSql = "INSERT INTO Users (user_id, email, username, created_on) VALUES (?, ?, ?, CURRENT_DATE)";
+            String insertSql = "INSERT INTO Users (user_id, email, username) VALUES (?, ?, ?)";
             PreparedStatement insertStmt = _postgresConnection.prepareStatement(insertSql);
 
             insertStmt.setInt(1, newUserId);
@@ -255,8 +526,8 @@ public class DeleteUpdateInsertStatements{
 
             insertStmt.setInt(1, user_id);
             insertStmt.setInt(2, part_id);
-            insertStmt.setInt(4, rating);
-            insertStmt.setString(5, comment);
+            insertStmt.setInt(3, rating);
+            insertStmt.setString(4, comment);
 
             insertStmt.executeUpdate();
             insertStmt.close();
@@ -275,7 +546,7 @@ public class DeleteUpdateInsertStatements{
 
     private int insert_pc_part(String manufacturer, String name, Float price, String description) throws Exception {
 
-        int newPartId = getNextId("PC_Parts", "part_id");
+        int newPartId = get_next_id("PC_Parts", "part_id");
 
         String insertSql =
             "INSERT INTO PC_Parts (part_id, manufacturer, name, release_date, price, description) " +
@@ -546,126 +817,103 @@ public class DeleteUpdateInsertStatements{
         }
     }
 
-    public void transaction_insert_pc(String name, Integer[] parts) throws Exception {
+    public void transaction_insert_pc(String name, List<Integer> parts) throws Exception {
 
         try {
-            if (parts == null || parts.length == 0) {
+            // 1. Validation checks using List methods
+            if (parts == null || parts.isEmpty()) {
                 throw new IllegalArgumentException("Parts list cannot be empty.");
             }
 
-            if (parts.length > 7) {
-                throw new InvalidPartCountException(
-                    "Transaction failed: Parts list exceeds 7 items."
-                );
+            if (parts.size() > 7) {
+                throw new InvalidPartCountException("Parts list exceeds 7 items.");
             }
 
+            // 2. Get the User ID (calling your existing helper)
             int user_id = get_user_id();
+            if (user_id == -1) {
+                System.out.println("Transaction cancelled: Invalid User ID.");
+                return;
+            }
 
             _postgresConnection.setAutoCommit(false);
 
-            // 1. Get next pc_id
-            String idSql = "Select coalesce(max(pc_id), 0) + 1 as next_id from PCs";
-
+            // 3. Get next pc_id
+            String idSql = "SELECT COALESCE(MAX(pc_id), 0) + 1 AS next_id FROM PCs";
             int newPcId;
-
             try (PreparedStatement idStmt = _postgresConnection.prepareStatement(idSql);
                 ResultSet idRs = idStmt.executeQuery()) {
-
                 idRs.next();
                 newPcId = idRs.getInt("next_id");
             }
 
-            // 2. Classify parts using Part_Type_Map
+            // 4. Classify parts using Part_Type_Map
             Map<String, Integer> selectedParts = new HashMap<>();
             Set<Integer> seen = new HashSet<>();
-
-            String typeSql = "Select part_type from Part_Type_Map where part_id = ?";
+            String typeSql = "SELECT part_type FROM Part_Type_Map WHERE part_id = ?";
 
             try (PreparedStatement typeStmt = _postgresConnection.prepareStatement(typeSql)) {
-
                 for (Integer partId : parts) {
-
                     if (partId == null) {
                         throw new IllegalArgumentException("Null part_id found in input.");
                     }
 
+                    // Check for duplicates in the list
                     if (!seen.add(partId)) {
-                        throw new IllegalArgumentException(
-                            "Duplicate part_id in input: " + partId
-                        );
+                        throw new IllegalArgumentException("Duplicate part_id in input: " + partId);
                     }
 
                     typeStmt.setInt(1, partId);
-
                     String type;
                     try (ResultSet rs = typeStmt.executeQuery()) {
                         if (!rs.next()) {
-                            throw new IllegalArgumentException(
-                                "Unknown part_id: " + partId
-                            );
+                            throw new IllegalArgumentException("Unknown part_id: " + partId);
                         }
                         type = rs.getString("part_type");
                     }
 
+                    // Prevent multiple parts of the same category (e.g., two CPUs)
                     if (selectedParts.containsKey(type)) {
-                        throw new IllegalArgumentException(
-                            "Multiple parts of type " + type + " are not allowed."
-                        );
+                        throw new IllegalArgumentException("Multiple parts of type " + type + " are not allowed.");
                     }
-
                     selectedParts.put(type, partId);
                 }
             }
 
-            // 3. Extract typed parts
-            Integer cpu = selectedParts.get("CPU");
-            Integer psu = selectedParts.get("PSU");
-            Integer ram_kit = selectedParts.get("RAM");
-            Integer gpu = selectedParts.get("GPU");
-            Integer motherboard = selectedParts.get("MOTHERBOARD");
-            Integer pc_case = selectedParts.get("PC_CASE");
-            Integer cooler = selectedParts.get("COOLER");
-
-            // 4. Insert PC
-            String insertSql =
-                "INSERT INTO PCs " +
+            // 5. Insert the new PC record
+            String insertSql = "INSERT INTO PCs " +
                 "(pc_id, name, user_id, cpu, psu, ram_kit, gpu, motherboard, pc_case, cooler, created_on) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
-            try (PreparedStatement insertStmt =
-                    _postgresConnection.prepareStatement(insertSql)) {
-
+            try (PreparedStatement insertStmt = _postgresConnection.prepareStatement(insertSql)) {
                 insertStmt.setInt(1, newPcId);
                 insertStmt.setString(2, name);
-                insertStmt.setInt(3, user_id); // must exist in your class context
-                insertStmt.setObject(4, cpu);
-                insertStmt.setObject(5, psu);
-                insertStmt.setObject(6, ram_kit);
-                insertStmt.setObject(7, gpu);
-                insertStmt.setObject(8, motherboard);
-                insertStmt.setObject(9, pc_case);
-                insertStmt.setObject(10, cooler);
+                insertStmt.setInt(3, user_id);
+                // using setObject handles potential nulls if the user submitted < 7 parts
+                insertStmt.setObject(4, selectedParts.get("CPU"));
+                insertStmt.setObject(5, selectedParts.get("PSU"));
+                insertStmt.setObject(6, selectedParts.get("RAM"));
+                insertStmt.setObject(7, selectedParts.get("GPU"));
+                insertStmt.setObject(8, selectedParts.get("MOTHERBOARD"));
+                insertStmt.setObject(9, selectedParts.get("PC_CASE"));
+                insertStmt.setObject(10, selectedParts.get("COOLER"));
 
                 insertStmt.executeUpdate();
             }
 
-            // 5. Commit
             _postgresConnection.commit();
-
-            System.out.println(
-                "INSERT SUCCESSFUL. New PC: " +
-                name + " (" + parts.length + "/7 parts added)"
-            );
+            System.out.println("INSERT SUCCESSFUL. New PC: " + name + " (" + parts.size() + "/7 parts added)");
 
         } catch (Exception e) {
-
-            _postgresConnection.rollback();
-
+            if (_postgresConnection != null) {
+                _postgresConnection.rollback();
+            }
             System.out.println("INSERT ERROR: " + e.getMessage());
-
+            throw e; // Re-throw to handle it in your main menu if needed
         } finally {
-
-            _postgresConnection.setAutoCommit(true);
+            if (_postgresConnection != null) {
+                _postgresConnection.setAutoCommit(true);
+            }
         }
     }
 
@@ -744,37 +992,162 @@ public class DeleteUpdateInsertStatements{
         }
     }
 
-    public void transaction_update_pc(Integer pc_id,
-                                 String name,
-                                 Integer cpu,
-                                 Integer psu,
-                                 Integer ram_kit,
-                                 Integer gpu,
-                                 Integer motherboard,
-                                 Integer pc_case,
-                                 Integer cooler) throws Exception {
+    public void transaction_update_review(Integer user_id, Integer part_id, Integer rating, String comment) throws Exception {
+        // 1. Let the user pick which review to update using the helper
+        Timestamp review_time = get_review_timestamp(user_id, part_id);
+        if (review_time == null) return;
 
         try {
             _postgresConnection.setAutoCommit(false);
 
-            String checkSql = "SELECT 1 FROM PCs WHERE pc_id = ?";
+            String updateSql = "UPDATE Part_Review SET rating = ?, review_text = ? " +
+                            "WHERE user_id = ? AND part_id = ? AND review_time = ?";
 
-            try (PreparedStatement checkStmt = _postgresConnection.prepareStatement(checkSql)) {
+            try (PreparedStatement stmt = _postgresConnection.prepareStatement(updateSql)) {
+                stmt.setInt(1, rating);
+                stmt.setString(2, comment);
+                stmt.setInt(3, user_id);
+                stmt.setInt(4, part_id);
+                stmt.setTimestamp(5, review_time);
+
+                int rows = stmt.executeUpdate();
+                if (rows == 0) {
+                    throw new SQLException("Update failed: Review no longer exists.");
+                }
+            }
+
+            _postgresConnection.commit();
+            System.out.println("UPDATE SUCCESSFUL. Review has been modified.");
+
+        } catch (Exception e) {
+            _postgresConnection.rollback();
+            System.out.println("UPDATE ERROR: " + e.getMessage());
+        } finally {
+            _postgresConnection.setAutoCommit(true);
+        }
+    }
+
+    public void transaction_update_pc(Integer pc_id,
+                                  String name,
+                                  List<Integer> part_ids) throws Exception {
+
+        if (part_ids == null || part_ids.isEmpty()) {
+            throw new IllegalArgumentException(
+                "At least one part_id is required."
+            );
+        }
+
+        if (part_ids.size() > 7) {
+            throw new IllegalArgumentException(
+                "Maximum of 7 part_ids allowed."
+            );
+        }
+
+        // Component slots
+        Integer cpu = null;
+        Integer psu = null;
+        Integer ram_kit = null;
+        Integer gpu = null;
+        Integer motherboard = null;
+        Integer pc_case = null;
+        Integer cooler = null;
+
+        try {
+            _postgresConnection.setAutoCommit(false);
+
+            // Verify PC exists
+            String checkPcSql =
+                "SELECT 1 FROM PCs WHERE pc_id = ?";
+
+            try (PreparedStatement checkStmt =
+                    _postgresConnection.prepareStatement(checkPcSql)) {
+
                 checkStmt.setInt(1, pc_id);
 
                 try (ResultSet rs = checkStmt.executeQuery()) {
+
                     if (!rs.next()) {
-                        throw new IllegalArgumentException("PC does not exist: " + pc_id);
+                        throw new IllegalArgumentException(
+                            "PC does not exist: " + pc_id
+                        );
                     }
                 }
             }
 
-            String updateSql =
-                "UPDATE PCs SET name = ?, cpu = ?, psu = ?, ram_kit = ?, gpu = ?, " +
-                "motherboard = ?, pc_case = ?, cooler = ? WHERE pc_id = ?";
+            // Process each part_id
+            for (Integer part_id : part_ids) {
 
-            try (PreparedStatement stmt = _postgresConnection.prepareStatement(updateSql)) {
+                // Verify part exists
+                if (!part_exists(part_id)) {
+                    throw new IllegalArgumentException(
+                        "Part does not exist: " + part_id
+                    );
+                }
+
+                // Determine part type
+                String partType = get_part_type(part_id);
+
+                if (partType == null) {
+                    throw new IllegalArgumentException(
+                        "No part type found for part_id: " + part_id
+                    );
+                }
+
+                switch (partType.toLowerCase()) {
+
+                    case "cpu":
+                        cpu = part_id;
+                        break;
+
+                    case "psu":
+                        psu = part_id;
+                        break;
+
+                    case "ram_kit":
+                        ram_kit = part_id;
+                        break;
+
+                    case "gpu":
+                        gpu = part_id;
+                        break;
+
+                    case "motherboard":
+                        motherboard = part_id;
+                        break;
+
+                    case "pc_case":
+                        pc_case = part_id;
+                        break;
+
+                    case "cooler":
+                        cooler = part_id;
+                        break;
+
+                    default:
+                        throw new IllegalArgumentException(
+                            "Unknown part type: " + partType
+                        );
+                }
+            }
+
+            // Update the PC
+            String updateSql =
+                "UPDATE PCs SET " +
+                "name = ?, " +
+                "cpu = ?, " +
+                "psu = ?, " +
+                "ram_kit = ?, " +
+                "gpu = ?, " +
+                "motherboard = ?, " +
+                "pc_case = ?, " +
+                "cooler = ? " +
+                "WHERE pc_id = ?";
+
+            try (PreparedStatement stmt =
+                    _postgresConnection.prepareStatement(updateSql)) {
+
                 stmt.setString(1, name);
+
                 stmt.setObject(2, cpu);
                 stmt.setObject(3, psu);
                 stmt.setObject(4, ram_kit);
@@ -782,6 +1155,7 @@ public class DeleteUpdateInsertStatements{
                 stmt.setObject(6, motherboard);
                 stmt.setObject(7, pc_case);
                 stmt.setObject(8, cooler);
+
                 stmt.setInt(9, pc_id);
 
                 stmt.executeUpdate();
@@ -789,12 +1163,22 @@ public class DeleteUpdateInsertStatements{
 
             _postgresConnection.commit();
 
-            System.out.println("UPDATE SUCCESSFUL. PC updated: " + pc_id);
+            System.out.println(
+                "UPDATE SUCCESSFUL. PC updated: " + pc_id
+            );
 
         } catch (Exception e) {
+
             _postgresConnection.rollback();
-            System.out.println("UPDATE ERROR: " + e.getMessage());
+
+            System.out.println(
+                "UPDATE ERROR: " + e.getMessage()
+            );
+
+            throw e;
+
         } finally {
+
             _postgresConnection.setAutoCommit(true);
         }
     }
@@ -1032,7 +1416,7 @@ public class DeleteUpdateInsertStatements{
         }
     }
 
-    public void transaction_update_motherboard(Integer part_id,
+    public void transaction_update_mobo(Integer part_id,
                                           String socket,
                                           String chipset,
                                           String ram_type,
@@ -1276,31 +1660,9 @@ public class DeleteUpdateInsertStatements{
         }
     }
 
-    public void transaction_delete_reviews_for_part(Integer part_id) throws Exception {
-
-        try {
-            _postgresConnection.setAutoCommit(false);
-
-            String deleteSql = "DELETE FROM Part_Review WHERE part_id = ?";
-
-            try (PreparedStatement stmt = _postgresConnection.prepareStatement(deleteSql)) {
-                stmt.setInt(1, part_id);
-                stmt.executeUpdate();
-            }
-
-            _postgresConnection.commit();
-
-            System.out.println("DELETE SUCCESSFUL. Removed reviews for part_id = " + part_id);
-
-        } catch (Exception e) {
-            _postgresConnection.rollback();
-            System.out.println("DELETE ERROR: " + e.getMessage());
-        } finally {
-            _postgresConnection.setAutoCommit(true);
-        }
-    }
-
-    public void transaction_delete_review(Integer user_id, Integer part_id, java.sql.Timestamp review_time) throws Exception {
+    public void transaction_delete_review(Integer user_id, Integer part_id) throws Exception {
+        Timestamp review_time = get_review_timestamp(user_id, part_id);
+        if (review_time == null) return; // User cancelled or no reviews
 
         try {
             _postgresConnection.setAutoCommit(false);

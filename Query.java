@@ -1,8 +1,13 @@
 import java.util.Properties;
+import java.util.Scanner;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 import java.io.FileInputStream;
 
@@ -11,6 +16,8 @@ import java.io.FileInputStream;
  */
 public class Query {
 	private static Properties configProps = new Properties();
+
+  private Scanner sc;
 	
 	private static String PostgreSqlServerDriver;
 	private static String PostgreSqlServerUrl;
@@ -21,6 +28,7 @@ public class Query {
 
 
   private Connection _postgreSqlDB; 
+  private DeleteUpdateInsertStatements _dui;
 
 
 	private String _begin_transaction_read_write_sql = "START TRANSACTION";
@@ -43,7 +51,7 @@ public class Query {
   "Join Motherboard m on p.motherboard = m.part_id " + 
   "Join RAM r on p.ram_kit = r.part_id " + 
   "Join Cooler cl on p.cooler = cl.part_id Where g.length_mm <= c.max_gpu_size " +
-  "And cpu.socket = m.socket And r.ram_type = m.ram_type And cl.socket_type = cpu.socket And m.form_factor = c.form_factor And p.pc_id = ?) then 1 Else 0 End as pc_validity;";
+  "And cpu.socket = m.socket And r.ram_type = m.ram_type And cl.socket_type Like '%' || cpu.socket || '%' And m.form_factor = c.form_factor And p.pc_id = ?) then 1 Else 0 End as pc_validity;";
   private PreparedStatement _compatability_check_statement;
   
   private String _users_complete_builds_sql = "Select distinct u.user_id from Users u join PCs p ON u.user_id = p.user_id where num_nonnulls(p.cpu, p.psu, p.ram_kit, p.gpu, p.motherboard, p.pc_case, p.cooler) = 7;";
@@ -120,6 +128,95 @@ public class Query {
   "Group by pp.part_id, pp.manufacturer, pp.name Having avg(pr.rating) > 0 " +
   "Order by avg_rating desc, review_count desc; ";
   private PreparedStatement _part_by_rating_review_statement;
+
+  public void setScanner(Scanner scanner) {
+    this.sc = scanner;
+  }
+
+  // INSERT DELEGATION METHODS
+
+  public void transaction_insert_user(String email, String username) throws Exception {
+    _dui.transaction_insert_user(email, username);
+  }
+
+  public void transaction_insert_favorite(Integer user_id, Integer part_id) throws Exception {
+    _dui.transaction_insert_favorite(user_id, part_id);
+  }
+
+  public void transaction_insert_review(Integer user_id, Integer part_id,
+                                        Integer rating, String comment) throws Exception {
+    _dui.transaction_insert_review(user_id, part_id, rating, comment);
+  }
+
+  // public void transaction_insert_pc_part(String manufacturer, String name,
+  //                                     Float price, String description) throws Exception {
+  //   _dui.transaction_insert_pc_part(manufacturer, name, price, description);
+  // }
+
+  public void transaction_insert_pc(String name, List<Integer> parts) throws Exception {
+    _dui.transaction_insert_pc(name, parts);
+  }
+
+
+  // UPDATE DELEGATION METHODS
+
+  public void transaction_update_user(Integer user_id,
+                                      String email,
+                                      String username) throws Exception {
+    _dui.transaction_update_user(user_id, email, username);
+  }
+
+  public void transaction_update_favorite(Integer user_id,
+                                          Integer old_part_id,
+                                          Integer new_part_id) throws Exception {
+    _dui.transaction_update_favorite(user_id, old_part_id, new_part_id);
+  }
+
+  public void transaction_update_review(Integer user_id,
+                                        Integer part_id,
+                                        Integer rating,
+                                        String comment) throws Exception {
+    _dui.transaction_update_review(user_id, part_id, rating, comment);
+  }
+
+  public void transaction_update_part(Integer part_id,
+                                      String manufacturer,
+                                      String name,
+                                      Float price,
+                                      String description) throws Exception {
+    _dui.transaction_update_pc_part(part_id, manufacturer, name, price, description);
+  }
+
+  public void transaction_update_pc(Integer pc_id,
+                                    String name,
+                                    List<Integer> part_ids) throws Exception {
+    _dui.transaction_update_pc(pc_id, name, part_ids);
+  }
+
+
+  // DELETE DELEGATION METHODS
+
+  public void transaction_delete_user(Integer user_id) throws Exception {
+    _dui.transaction_delete_user(user_id);
+  }
+
+  public void transaction_delete_pc_part(Integer part_id) throws Exception {
+    _dui.transaction_delete_pc_part(part_id);
+  }
+
+  public void transaction_delete_pc(Integer pc_id) throws Exception {
+    _dui.transaction_delete_pc(pc_id);
+  }
+
+  public void transaction_delete_favorite(Integer user_id,
+                                          Integer part_id) throws Exception {
+    _dui.transaction_delete_favorite(user_id, part_id);
+  }
+
+  public void transaction_delete_review(Integer user_id,
+                                        Integer part_id) throws Exception {
+    _dui.transaction_delete_review(user_id, part_id);
+  }
  
 	public Query() {
 	}
@@ -146,6 +243,8 @@ public class Query {
         
         /* open a connection to your postgreSQL database that contains the customer database */
         _postgreSqlDB = DriverManager.getConnection(PostgreSqlConnectionString);
+
+        _dui = new DeleteUpdateInsertStatements(_postgreSqlDB);
         		
 	}
 
@@ -328,13 +427,214 @@ public class Query {
         break;
       }
   }
-  
-  public void transaction_insert(String statement) {
-  
+
+  public Map<String, Object> get_typed_inputs(Map<String, Class<?>> schema) {
+    Map<String, Object> responses = new LinkedHashMap<>();
+
+    for (Map.Entry<String, Class<?>> entry : schema.entrySet()) {
+      String fieldName = entry.getKey();
+      Class<?> expectedType = entry.getValue();
+      boolean isValid = false;
+
+      while (!isValid) {
+        System.out.print("Enter " + fieldName + ": ");
+        String input = sc.nextLine().trim();
+
+        if (expectedType == Integer.class) {
+          // Check if it's only digits
+          if (input.matches("\\d+")) {
+            responses.put(fieldName, Integer.parseInt(input));
+            isValid = true;
+          } else {
+            System.out.println("Invalid input. " + fieldName + " must be a whole number.");
+          }
+        } else if (expectedType == String.class) {
+          if (!input.isEmpty()) {
+            responses.put(fieldName, input);
+            isValid = true;
+          } else {
+            System.out.println(fieldName + " cannot be empty.");
+          }
+        }
+        else if (expectedType == Float.class) {
+          if (input.matches("^[0-9]*\\.?[0-9]+$")) { // Regex for decimals
+            responses.put(fieldName, Float.parseFloat(input));
+            isValid = true;
+          } else {
+            System.out.println("Invalid input. " + fieldName + " must be a number (e.g. 19.99).");
+          }
+        }
+
+      }
+    }
+    return responses;
   }
   
-  public void transaction_update(String statement) {
+  public void transaction_insert_part(Integer n) throws Exception {
+    Map<String, Class<?>> schema = new LinkedHashMap<>();
+    Map<String, Object> results;
+
+    // Start every schema with the common PC_Part fields
+    schema.put("Manufacturer", String.class);
+    schema.put("Name", String.class);
+    schema.put("Price", Float.class);
+    schema.put("Description", String.class);
+
+    switch(n) {
+      case 1: // CPU
+      schema.put("Socket", String.class);
+      schema.put("TDP", Integer.class);
+      schema.put("Core Count", Integer.class);
+      schema.put("Base Clock", Integer.class);
+      schema.put("Thread Count", Integer.class);
+      schema.put("Boost Clock", Integer.class);
+      results = get_typed_inputs(schema);
+      _dui.transaction_insert_cpu(results);
+      break;
+
+      case 2: // GPU
+      schema.put("VRAM", Integer.class);
+      schema.put("Chipset", String.class);
+      schema.put("Length (mm)", Integer.class);
+      schema.put("Power Connectors", String.class);
+      results = get_typed_inputs(schema);
+      _dui.transaction_insert_gpu(results);
+      break;
+
+      case 3: // RAM
+      schema.put("RAM Type", String.class);
+      schema.put("Number of Sticks", Integer.class);
+      schema.put("Capacity", Integer.class);
+      schema.put("Speed", Integer.class);
+      results = get_typed_inputs(schema);
+      _dui.transaction_insert_ram(results);
+      break;
+
+      case 4: // PSU
+      schema.put("Modular", String.class);
+      schema.put("Wattage", Integer.class);
+      schema.put("Efficiency", String.class);
+      results = get_typed_inputs(schema);
+      _dui.transaction_insert_psu(results);
+      break;
+
+      case 5: // Case
+      schema.put("Max GPU Size", Integer.class);
+      schema.put("Form Factor", String.class);
+      schema.put("Color", String.class);
+      results = get_typed_inputs(schema);
+      _dui.transaction_insert_pc_case(results);
+      break;
+
+      case 6: // CPU Cooler
+      schema.put("Cooler Type", String.class);
+      schema.put("Socket Type", String.class);
+      results = get_typed_inputs(schema);
+      _dui.transaction_insert_cooler(results);
+      break;
+
+      case 7: // Motherboard
+      schema.put("Socket", String.class);
+      schema.put("Chipset", String.class);
+      schema.put("RAM Type", String.class);
+      schema.put("Form Factor", String.class);
+      schema.put("Max RAM", Integer.class);
+      results = get_typed_inputs(schema);
+      _dui.transaction_insert_mobo(results);
+      break;
+
+      default:
+      System.out.println("Error: number not a valid part. Booting back to main loop.");
+      break;
+    }
+  }
   
+  public void transaction_update_part(Integer n) throws Exception {
+    // 1. Get the ID of the part we want to update
+    Map<String, Class<?>> idSchema = new LinkedHashMap<>();
+    idSchema.put("Part ID", Integer.class);
+    Map<String, Object> idResult = get_typed_inputs(idSchema);
+
+    int part_id = (Integer) idResult.get("Part ID");
+    
+    // 2. Prepare schema for generic PC_Part info
+    Map<String, Class<?>> genericSchema = new LinkedHashMap<>();
+    genericSchema.put("Manufacturer", String.class);
+    genericSchema.put("Name", String.class);
+    genericSchema.put("Price", Float.class);
+    genericSchema.put("Description", String.class);
+    
+    System.out.println("--- Updating Generic Part Information ---");
+    Map<String, Object> genericResults = get_typed_inputs(genericSchema);
+
+    // Execute the generic update first
+    _dui.transaction_update_pc_part(part_id, genericResults);
+
+    // 3. Prepare schema for specific hardware specs
+    Map<String, Class<?>> specSchema = new LinkedHashMap<>();
+
+    System.out.println("--- Updating Specific Hardware Specs ---");
+
+    switch(n) {
+      case 1: // CPU
+        specSchema.put("Socket", String.class);
+        specSchema.put("TDP", Integer.class);
+        specSchema.put("Core Count", Integer.class);
+        specSchema.put("Base Clock", Integer.class);
+        specSchema.put("Thread Count", Integer.class);
+        specSchema.put("Boost Clock", Integer.class);
+        _dui.transaction_update_cpu(part_id, get_typed_inputs(specSchema));
+        break;
+
+      case 2: // GPU
+        specSchema.put("VRAM", Integer.class);
+        specSchema.put("Chipset", String.class);
+        specSchema.put("Length (mm)", Integer.class);
+        specSchema.put("Power Connectors", String.class);
+        _dui.transaction_update_gpu(part_id, get_typed_inputs(specSchema));
+        break;
+
+      case 3: // RAM
+        specSchema.put("RAM Type", String.class);
+        specSchema.put("Number of Sticks", Integer.class);
+        specSchema.put("Capacity", Integer.class);
+        specSchema.put("Speed", Integer.class);
+        _dui.transaction_update_ram(part_id, get_typed_inputs(specSchema));
+        break;
+
+      case 4: // PSU
+        specSchema.put("Modular", String.class);
+        specSchema.put("Wattage", Integer.class);
+        specSchema.put("Efficiency", String.class);
+        _dui.transaction_update_psu(part_id, get_typed_inputs(specSchema));
+        break;
+
+      case 5: // Case
+        specSchema.put("Max GPU Size", Integer.class);
+        specSchema.put("Form Factor", String.class);
+        specSchema.put("Color", String.class);
+        _dui.transaction_update_pc_case(part_id, get_typed_inputs(specSchema));
+        break;
+
+      case 6: // Cooler
+        specSchema.put("Cooler Type", String.class);
+        specSchema.put("Socket Type", String.class);
+        _dui.transaction_update_cooler(part_id, get_typed_inputs(specSchema));
+        break;
+
+      case 7: // Motherboard
+        specSchema.put("Socket", String.class);
+        specSchema.put("Chipset", String.class);
+        specSchema.put("RAM Type", String.class);
+        specSchema.put("Form Factor", String.class);
+        specSchema.put("Max RAM", Integer.class);
+        _dui.transaction_update_mobo(part_id, get_typed_inputs(specSchema));
+        break;
+
+      default:
+        System.out.println("Invalid part type selection.");
+        break;
+    }
   }
   
   public void transaction_delete(String statement) {
