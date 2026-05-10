@@ -1103,7 +1103,7 @@ public class DeleteUpdateInsertStatements {
                         psu = part_id;
                         break;
 
-                    case "ram_kit":
+                    case "ram":
                         ram_kit = part_id;
                         break;
 
